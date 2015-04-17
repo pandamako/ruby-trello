@@ -30,7 +30,7 @@ module Trello
           url: request.uri.to_s,
           headers: request.headers,
           payload: request.body,
-          timeout: 10
+          timeout: 30
         )
       end
     end
