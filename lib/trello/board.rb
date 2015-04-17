@@ -87,7 +87,7 @@ module Trello
     # This method, when called, can take a hash table with a filter key containing any
     # of the following values:
     #    :filter => [ :none, :open, :closed, :all ] # default :open
-    many :cards, filter: :none
+    many :cards, filter: :all
 
     # Returns all the lists on this board.
     #
