@@ -6,6 +6,7 @@ module Trello
 
     let(:board) { client.find(:board, 'abcdef123456789123456789') }
     let(:client) { Client.new }
+    let(:member) { Member.new(user_payload) }
 
     before(:each) do
       client.stub(:get).with("/boards/abcdef123456789123456789", {}).
@@ -53,6 +54,10 @@ module Trello
       it "knows if it is closed or open" do
         board.closed?.should_not be_nil
       end
+      
+      it "knows if it is starred or not" do
+        board.starred?.should_not be_nil
+      end
 
       it "gets its url" do
         board.url.should_not be_nil
@@ -79,10 +84,30 @@ module Trello
 
     context "labels" do
       it "gets the specific labels for the board" do
+        client.stub(:get).with("/boards/abcdef123456789123456789/labels").
+          and_return label_payload
+        labels = board.labels false
+        labels.count.should eq(4)
+
+
+        expect(labels[2].color).to  eq('red')
+        expect(labels[2].id).to  eq('abcdef123456789123456789')
+        expect(labels[2].board_id).to  eq('abcdef123456789123456789')
+        expect(labels[2].name).to  eq('deploy')
+        expect(labels[2].uses).to  eq(2)
+
+        expect(labels[3].color).to  eq('blue')
+        expect(labels[3].id).to  eq('abcdef123456789123456789')
+        expect(labels[3].board_id).to  eq('abcdef123456789123456789')
+        expect(labels[3].name).to  eq('on hold')
+        expect(labels[3].uses).to  eq(6)
+      end
+
+      it "gets the specific labels for the board" do
         client.stub(:get).with("/boards/abcdef123456789123456789/labelnames").
           and_return label_name_payload
 
-        board.labels.count.should eq(6)
+        board.labels.count.should eq(10)
       end
     end
 
@@ -91,6 +116,25 @@ module Trello
         client.stub(:get).with("/boards/abcdef123456789123456789/cards/1").
           and_return card_payload
         board.find_card(1).should be_a(Card)
+      end
+    end
+
+    context "add_member" do
+      it "adds a member to the board as a normal user (default)" do
+        client.stub(:put).with("/boards/abcdef123456789123456789/members/id", type: :normal)
+        board.add_member(member)
+      end
+
+      it "adds a member to the board as an admin" do
+        client.stub(:put).with("/boards/abcdef123456789123456789/members/id", type: :admin)
+        board.add_member(member, :admin)
+      end
+    end
+
+    context "remove_member" do
+      it "removes a member from the board" do
+        client.stub(:delete).with("/boards/abcdef123456789123456789/members/id")
+        board.remove_member(member)
       end
     end
 
@@ -124,6 +168,10 @@ module Trello
     it "is not closed" do
       expect(board.closed?).not_to be(true)
     end
+    
+     it "is not starred" do
+      expect(board.starred?).not_to be(true)
+    end
 
     describe "#update_fields" do
       it "does not set any fields when the fields argument is empty" do
@@ -132,6 +180,7 @@ module Trello
          'name' => "name",
          'desc' => "desc",
          'closed' => false,
+         'starred' => false,
          'url' => "url",
          'idOrganization' => "org_id"
         }
@@ -169,7 +218,7 @@ module Trello
       end
 
       it "puts all fields except id" do
-        expected_fields = %w{ name description closed idOrganization}.map { |s| s.to_sym }
+        expected_fields = %w{ name description closed starred idOrganization}.map { |s| s.to_sym }
 
         client.should_receive(:put) do |anything, body|
           body.keys.should =~ expected_fields
@@ -218,11 +267,13 @@ module Trello
         board.name        = "new name"
         board.description = "new description"
         board.closed      = true
+        board.starred      = true
 
         client.should_receive(:put).with("/boards/#{board.id}/", {
           name: "new name",
           description: "new description",
           closed: true,
+          starred: true,
           idOrganization: nil
         }).and_return any_board_json
         board.update!
